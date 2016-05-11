@@ -69,40 +69,67 @@ metadata {
 		input description: "Please consult AEOTEC MULTISENSOR 6 operating manual for advanced setting options. You can skip this configuration to use default settings",
 				title: "Advanced Configuration", displayDuringSetup: true, type: "paragraph", element: "paragraph"
 
-		input "motionDelayTime", "enum", title: "Motion Sensor Delay Time",
+		input "reportInterval", "enum", title: "Sensors Report Interval", description: "how frequently a report is generated",
+				options: ["20 seconds", "40 seconds", "1 minute", "2 minutes", "3 minutes", "4 minutes", "5 minutes", "8 minutes", "15 minutes", "30 minutes", "1 hour", "6 hours", "12 hours", "18 hours", "24 hours"], 
+                defaultValue: "${reportInterval}", displayDuringSetup: true
+	
+		input "motionDelayTime", "enum", title: "Motion Sensor Delay Time", description: "number of seconds to wait to report motion cleared after a motion event if there is no motion detected.",
 				options: ["20 seconds", "40 seconds", "1 minute", "2 minutes", "3 minutes", "4 minutes"], defaultValue: "${motionDelayTime}", displayDuringSetup: true
 
-		input "motionSensitivity", "enum", title: "Motion Sensor Sensitivity", options: ["normal","maximum","minimum"], defaultValue: "${motionSensitivity}", displayDuringSetup: true
+		input "motionSensitivity", "enum", title: "Motion Sensor Sensitivity", options: ["normal","maximum","minimum"], 
+        	defaultValue: "${motionSensitivity}", displayDuringSetup: true
 
-		input "reportInterval", "enum", title: "Sensors Report Interval",
-				options: ["8 minutes", "15 minutes", "30 minutes", "1 hour", "6 hours", "12 hours", "18 hours", "24 hours"], defaultValue: "${reportInterval}", displayDuringSetup: true
-	}
+		input "tempOffset",	"number", title: "Temperature Offset", description: "number applied to the monitored value",
+            range: "-20..20", defaultValue: 0, required: false, displayDuringSetup: false
+            
+		input "humidityOffset", "number", title: "Humidity Offset", description: "value applied to the monitored value",
+			range: "-50..50", defaultValue: 0, required: false, displayDuringSetup: false
+            
+		input "luminanceOffset", "number", title: "Luminance Offset", description: "value applied to the monitored value",
+            range: "-1000..1000", defaultValue: 0, required: false, displayDuringSetup: false
+            
+		input "ultravioletOffset", "number", title: "Ultraviolet Offset", description: "value applied to the monitored value",
+            range: "-10..10", defaultValue: 0, required: false,	displayDuringSetup: false
+    }
 
 	tiles(scale: 2) {
-		multiAttributeTile(name:"motion", type: "generic", width: 6, height: 4){
-			tileAttribute ("device.motion", key: "PRIMARY_CONTROL") {
-				attributeState "active", label:'motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
-				attributeState "inactive", label:'no motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
-			}
+		multiAttributeTile(name:"main", type:"generic", width:6, height:4) {
+			tileAttribute("device.temperature", key: "PRIMARY_CONTROL") {
+            	attributeState "temperature",label:'${currentValue}°',backgroundColors:[
+                	[value: 32, color: "#153591"],
+                    [value: 44, color: "#1e9cbb"],
+                    [value: 59, color: "#90d2a7"],
+					[value: 74, color: "#44b621"],
+					[value: 84, color: "#f1d801"],
+					[value: 92, color: "#d04e00"],
+					[value: 98, color: "#bc2323"]
+				]       
+            }
+            tileAttribute("device.humidity", key: "SECONDARY_CONTROL") {
+                attributeState "humidity",label:'RH ${currentValue}%',icon:" "
+            }
 		}
 		valueTile("temperature", "device.temperature", inactiveLabel: false, width: 2, height: 2) {
-			state "temperature", label:'${currentValue}°',
-			backgroundColors:[
-				[value: 32, color: "#153591"],
-				[value: 44, color: "#1e9cbb"],
-				[value: 59, color: "#90d2a7"],
+			state "temperature",label:'${currentValue}°',backgroundColors:[
+                [value: 32, color: "#153591"],
+                [value: 44, color: "#1e9cbb"],
+                [value: 59, color: "#90d2a7"],
 				[value: 74, color: "#44b621"],
 				[value: 84, color: "#f1d801"],
 				[value: 92, color: "#d04e00"],
 				[value: 98, color: "#bc2323"]
-			]
+			]       
 		}
-		valueTile("humidity", "device.humidity", inactiveLabel: false, width: 2, height: 2) {
-			state "humidity", label:'${currentValue}% humidity', unit:""
+        valueTile("humidity", "device.humidity", inactiveLabel: false, width:2, height: 2) {
+        	state "humidity", label:'RH ${currentValue}%'
+        }
+		valueTile("motion", "device.motion", inactiveLabel: false, width: 2, height: 2) {
+			state "active", label:'motion', icon:"st.motion.motion.active", backgroundColor:"#53a7c0"
+			state "inactive", label:'no motion', icon:"st.motion.motion.inactive", backgroundColor:"#ffffff"
 		}
 
 		valueTile("illuminance", "device.illuminance", inactiveLabel: false, width: 2, height: 2) {
-			state "illuminance", label:'${currentValue} ${unit}', unit:"lux"
+			state "illuminance", label:'${currentValue} lux', unit:"lux"
 		}
 
 		valueTile("ultravioletIndex", "device.ultravioletIndex", inactiveLabel: false, width: 2, height: 2) {
@@ -121,8 +148,8 @@ metadata {
 			state "powerSupply", label:'${currentValue} powered', backgroundColor:"#ffffff"
 		}
 
-		main(["motion", "temperature", "humidity", "illuminance", "ultravioletIndex"])
-		details(["motion", "temperature", "humidity", "illuminance", "ultravioletIndex", "batteryStatus"])
+		main(["main"])
+		details(["main", "motion","illuminance", "ultravioletIndex", "powerSupply", "batteryStatus"])
 	}
 }
 
@@ -228,28 +255,41 @@ def zwaveEvent(physicalgraph.zwave.commands.batteryv1.BatteryReport cmd) {
 	result
 }
 
-def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv5.SensorMultilevelReport cmd){
+def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv5.SensorMultilevelReport cmd) {
 	def map = [:]
 	switch (cmd.sensorType) {
 		case 1:
 			map.name = "temperature"
 			def cmdScale = cmd.scale == 1 ? "F" : "C"
-			map.value = convertTemperatureIfNeeded(cmd.scaledSensorValue, cmdScale, cmd.precision)
+            map.value = convertTemperatureIfNeeded(cmd.scaledSensorValue, cmdScale, cmd.precision) as float
+            if (tempOffset) {
+				map.value = map.value + tempOffset
+          		map.value = map.value.round(1)
+            } 
 			map.unit = getTemperatureScale()
 			break
 		case 3:
 			map.name = "illuminance"
-			map.value = cmd.scaledSensorValue.toInteger()
+            map.value = cmd.scaledSensorValue.toInteger()
+            if (luminanceOffset) {
+				map.value = map.value + luminanceOffset
+            }
 			map.unit = "lux"
 			break
 		case 5:
 			map.name = "humidity"
-			map.value = cmd.scaledSensorValue.toInteger()
+            map.value = cmd.scaledSensorValue.toInteger()
+            if (humidityOffset) {
+				map.value = map.value + humidityOffset
+            }
 			map.unit = "%"
 			break
 		case 0x1B:
 			map.name = "ultravioletIndex"
 			map.value = cmd.scaledSensorValue.toInteger()
+            if (ultravioletOffset) {
+            	map.value = map.value + ultravioletOffset
+            }
 			break
 		default:
 			map.descriptionText = cmd.toString()
@@ -328,6 +368,7 @@ def zwaveEvent(physicalgraph.zwave.Command cmd) {
 def configure() {
 	// This sensor joins as a secure device if you double-click the button to include it
 	log.debug "${device.displayName} is configuring its settings"
+        
 	def request = []
 
 	//1. set association groups for hub
