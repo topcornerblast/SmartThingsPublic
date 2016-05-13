@@ -79,17 +79,17 @@ metadata {
 		input "motionSensitivity", "enum", title: "Motion Sensor Sensitivity", options: ["normal","maximum","minimum"], 
         	defaultValue: "${motionSensitivity}", displayDuringSetup: true
 
-		input "tempOffset",	"number", title: "Temperature Offset", description: "number applied to the monitored value",
-            range: "-20..20", defaultValue: 0, required: false, displayDuringSetup: false
+		input "tempOffset",	type: "decimal", title: "Temperature Offset", description: "number applied to the monitored value",
+            required: false, displayDuringSetup: false
             
 		input "humidityOffset", "number", title: "Humidity Offset", description: "value applied to the monitored value",
-			range: "-50..50", defaultValue: 0, required: false, displayDuringSetup: false
+			range: "-50..50", required: false, displayDuringSetup: false
             
 		input "luminanceOffset", "number", title: "Luminance Offset", description: "value applied to the monitored value",
-            range: "-1000..1000", defaultValue: 0, required: false, displayDuringSetup: false
+            range: "-1000..1000", required: false, displayDuringSetup: false
             
 		input "ultravioletOffset", "number", title: "Ultraviolet Offset", description: "value applied to the monitored value",
-            range: "-10..10", defaultValue: 0, required: false,	displayDuringSetup: false
+            range: "-10..10", required: false, displayDuringSetup: false
     }
 
 	tiles(scale: 2) {
@@ -261,11 +261,12 @@ def zwaveEvent(physicalgraph.zwave.commands.sensormultilevelv5.SensorMultilevelR
 		case 1:
 			map.name = "temperature"
 			def cmdScale = cmd.scale == 1 ? "F" : "C"
-            map.value = convertTemperatureIfNeeded(cmd.scaledSensorValue, cmdScale, cmd.precision) as float
+            float tempFlt = Float.parseFloat(convertTemperatureIfNeeded(cmd.scaledSensorValue, cmcale, cmd.precision))
             if (tempOffset) {
-				map.value = map.value + tempOffset
-          		map.value = map.value.round(1)
+				tempFlt = (tempFlt + Float.parseFloat(tempOffset)) as float
+        		
             } 
+            map.value = tempFlt.round(1)
 			map.unit = getTemperatureScale()
 			break
 		case 3:
